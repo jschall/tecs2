@@ -32,13 +32,30 @@ def zero_intercept(ptx,pty,b1,b2):
 fns = glob.glob('UIUC-propDB/**/data/*.txt')
 
 propdata = {
+    "pitch/D":[],
     "pitch":[],
     "D":[],
     "c75":[],
+    "c75/R":[],
     "CT0":[],
     "dCTdJ":[],
-    "etamax":[]
+    "etamax":[],
+    "RPM/D":[],
+    "dalphadJ0*C75/D":[]
     }
+
+maxrpms = {}
+
+for fn in fns:
+    try:
+        name,diameter_inches,pitch_inches,rpm = re.match(r"^([^_]+)_([0-9.]+)x([0-9.]+).+([0-9]{4})\.txt", os.path.split(fn)[-1]).groups()
+        rpm = float(rpm)
+
+        maxrpm = maxrpms.get((name,diameter_inches,pitch_inches),0)
+        if rpm > maxrpm:
+            maxrpms[(name,diameter_inches,pitch_inches)] = rpm
+    except:
+        continue
 
 index = []
 
@@ -47,7 +64,7 @@ for fn in fns:
         if "volume-2" in fn:
             continue
 
-        #if "apce" not in fn:
+        #if "apc" not in fn:
             #continue
 
         reader = csv.reader(f, delimiter=' ', skipinitialspace=True)
@@ -61,6 +78,7 @@ for fn in fns:
 
         try:
             name,diameter_inches,pitch_inches,rpm = re.match(r"^([^_]+)_([0-9.]+)x([0-9.]+).+([0-9]{4})\.txt", os.path.split(fn)[-1]).groups()
+
             geomfn = os.path.split(fn)[0]+"/"+name+"_"+diameter_inches+"x"+pitch_inches+"_geom.txt"
             D = float(diameter_inches)*0.0254
             pitch = float(pitch_inches)*0.0254
@@ -70,6 +88,9 @@ for fn in fns:
             if pitch < D*0.2:
                 D /= 10
 
+            #if maxrpms[(name,diameter_inches,pitch_inches)] > rpm:
+                #continue
+
             c75 = None
             beta75 = None
             with open(geomfn) as geom_f:
@@ -78,7 +99,7 @@ for fn in fns:
 
                 for row in geom_rows:
                     if row[0] == '0.75':
-                        c75 = float(row[1])
+                        c75 = float(row[1])*D/2
                         beta75 = float(row[2])
             if c75 is None:
                 continue
@@ -97,7 +118,7 @@ for fn in fns:
                 continue
             prev_J = float(row[0])
             J.append(float(row[0]))
-            CT.append(float(row[2]))
+            CT.append(float(row[1]))
             CP.append(float(row[2]))
             eta.append(float(row[3]))
 
@@ -125,6 +146,10 @@ for fn in fns:
 
         pitch_calculated = 2*pi*tan(radians(beta75))*D*0.5*0.75
 
+        beta75_calculated = atan(pitch/(2*pi*D*0.5*0.75))
+
+        dalphadJ0 = -1.33333333333333/(pi*(1 + 2.77777777777778*pitch**2/(pi**2*D**2)))
+
         #plt.plot(D,pitch,marker='x')
 
         J_corrected = J*D/pitch
@@ -140,12 +165,16 @@ for fn in fns:
         #plt.plot(J,CT,linestyle='',marker='x')
         #plt.plot(J,CT_linefit,label=fn)
         #print(fn)
+        propdata["dalphadJ0*C75/D"].append(dalphadJ0*c75/D)
+        propdata["pitch/D"].append(pitch/D)
         propdata["pitch"].append(pitch)
         propdata["D"].append(D)
         propdata["c75"].append(c75)
+        propdata["c75/R"].append(c75/D*2)
         propdata["CT0"].append(-params[1]/params[0]*D/pitch)
         propdata["dCTdJ"].append(params[0])
         propdata["etamax"].append(max(eta))
+        propdata["RPM/D"].append(rpm/D/120)
         index.append(fn)
 
         if pitch > 0.3:
@@ -153,41 +182,60 @@ for fn in fns:
 
 df = pd.DataFrame(propdata, index=index)
 
-X = df[['pitch','D','c75']]
+print()
+print(df.mean())
+print()
+print(df.std())
+print()
+
+X = df[['pitch/D','c75/R']]
 y = df['CT0']
 
-#fig, axes = plt.subplots(nrows=2, ncols=3)
 
-fig = plt.figure(figsize=(10, 10))
-ax = plt.axes(projection='3d')
+#fig = plt.figure(figsize=(10, 10))
+#ax = plt.axes(projection='3d')
 
-ax.scatter3D(df['pitch'],df['c75'],df['dCTdJ'])
-plt.xlabel('pitch')
-plt.ylabel('c75')
+#ax.scatter3D(df['pitch/D'],df['c75'],df['dCTdJ'])
+#plt.xlabel('pitch')
+#plt.ylabel('c75')
 
-#df.plot.scatter(x='pitch', y='dCTdJ', ax=axes[0,0])
-#df.plot.scatter(x='D', y='dCTdJ', ax=axes[0,1])
-#df.plot.scatter(x='c75', y='dCTdJ', ax=axes[0,2])
+fig, axes = plt.subplots(nrows=2, ncols=3)
+df.plot.scatter(x='dalphadJ0*C75/D', y='dCTdJ', ax=axes[0,0])
+df.plot.scatter(x='D', y='dCTdJ', ax=axes[0,1])
+df.plot.scatter(x='c75/R', y='dCTdJ', ax=axes[0,2])
 
-#df.plot.scatter(x='pitch', y='CT0', ax=axes[1,0])
-#df.plot.scatter(x='D', y='CT0', ax=axes[1,1])
-#df.plot.scatter(x='c75', y='CT0', ax=axes[1,2])
+df.plot.scatter(x='pitch/D', y='CT0', ax=axes[1,0])
+df.plot.scatter(x='dalphadJ0*C75/D', y='CT0', ax=axes[1,1])
+df.plot.scatter(x='c75/R', y='CT0', ax=axes[1,2])
 
 from sklearn import linear_model
 regr = linear_model.HuberRegressor()
 regr.fit(X, y)
 print("score", regr.score(X,y))
-#print(regr.coef_)
-#print(regr.intercept_)
-print("CT0", regr.predict([[.53,.6604,.0067]])*.53/.6604)
+
+print("CT0", regr.predict([[0.7884615384615384,.0067]])*0.7884615384615384)
 
 #print(regr.predict([[.254,.2794,.125]])) # apce11x10
 
+X = df[['dalphadJ0*C75/D','c75/R']]
 y = df['dCTdJ']
 regr = linear_model.HuberRegressor()
 regr.fit(X, y)
+print(regr.coef_)
+print(regr.intercept_)
+
+D = .6604
+pitch = .5207
+c75 = 0.022
+dalphadJ0 = -1.33333333333333/(pi*(1 + 2.77777777777778*pitch**2/(pi**2*D**2)))
+
+print("dalphadJ0", dalphadJ0)
 print("score", regr.score(X,y))
-print("dCTdJ", regr.predict([[.53,.6604,.0067]]))
+print("dCTdJ", regr.predict([[dalphadJ0*0.022/(D/2),.022]]))
+#print(regr.coef_*np.matrix([.53,.6604,.0067]).transpose()+regr.intercept_)
+#print(regr.coef_.transpose())
+#print(regr.intercept_)
+
 #print(regr.predict([[.254,.2794,.125]]))# apce11x10
 
 

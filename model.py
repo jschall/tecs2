@@ -1,38 +1,62 @@
 from sympy import *
 from math import radians
-# states:
+
+####### State vector (x) #######
+# SKE is specific kinetic energy, a function of true airspeed.
+# SPEdot is rate of change of specific potential energy, a function of climb rate.
+# prop_omega is the rotation rate of the propeller in radians per second.
+# Vmotor is the voltage in to the motor. This is a state in the controller because we want to apply a limit to the rate of change of throttle.
 SKE = Symbol("SKE", real=True)
 SPEdot = Symbol("SPEdot", real=True)
 prop_omega = Symbol("prop_omega", real=True)
 Vmotor = Symbol("Vmotor", real=True)
-x = Matrix([SKE,SPEdot,prop_omega])
+x = Matrix([SKE,SPEdot,prop_omega,Vmotor])
 
-# inputs:
+####### Input vector (u) #######
+# thetadot is the rate of change of pitch angle. It can be related to vertical acceleration through the centripetal force equation, under the assumption that alpha is not varying.
+# Vmotordot is the rate of change of Vmotor
 thetadot = Symbol("thetadot", real=True)
 Vmotordot = Symbol("Vmotordot", real=True)
-u = Matrix([thetadot, Vmotor])
+u = Matrix([thetadot, Vmotordot])
 
-# parameters:
+####### Parameters #######
+# Motor parameters
+# kv: motor kv in V/RPM
+# R: motor resistance
 motor_kv = Symbol("motor_kv", real=True, positive=True)
 motor_R = Symbol("motor_R", real=True, positive=True)
-prop_CT = Symbol("prop_CT", real=True, positive=True)
+
+# Propeller parameters
+# J0T: advance ratio at which thrust coefficient is zero. Typical value 1.25*pitch/diameter, but varies up to 30%.
+# J0P: advance ratio at which power coefficient is zero
+# dCTdJ: slope of thrust coefficient WRT advance ratio
+# dCPdJ: slope of power coefficient WRT advance ratio
 prop_D = Symbol("prop_D", real=True, positive=True)
 prop_Ixx = Symbol("prop_Ixx", real=True, positive=True)
-prop_efficiency = Symbol("prop_eta", real=True, positive=True)
-prop_pitch = Symbol("prop_pitch", real=True, positive=True)
+prop_J0T   = Symbol("prop_J0T", real=True, positive=True)
+prop_J0P   = Symbol("prop_J0P", real=True, positive=True) #
+prop_dCTdJ = Symbol("prop_dCTdJ", real=True)
+prop_dCPdJ = Symbol("prop_dCPdJ", real=True)
 
-prop_J0T   = Symbol("prop_J0T", real=True, positive=True) # advance ratio at which thrust coefficient is zero
-prop_J0P   = Symbol("prop_J0P", real=True, positive=True) # advance ratio at which power coefficient is zero
-prop_dCTdJ = Symbol("prop_dCTdJ", real=True) # slope of thrust coefficient WRT advance ratio
-prop_dCPdJ = Symbol("prop_dCPdJ", real=True) # slope of power coefficient WRT advance ratio
-
-rho = Symbol("rho", real=True, positive=True)
-mass = Symbol("mass", real=True, positive=True)
-G = Symbol("G", real=True, positive=True)
+# Plane parameters
+# wingspan: wingspan in meters
+# chord: mean chord length in meters
+# CD0: drag coefficient of airplane at alpha=0 without propeller. Defined as drag force = 0.5*rho*V**2*S*CD0, where S is wing area. Typical range 0.01 for a very efficient glider to 0.05 for a draggy airframe.
+# mass: mass of airplane in kg
+# bank_rad: the current angle of bank in radians
+plane_wingspan = Symbol("plane_wingspan", real=True, positive=True)
+plane_chord = Symbol("plane_chord", real=True, positive=True)
 plane_CD0 = Symbol("plane_CD0", real=True, positive=True)
-plane_AR = Symbol("plane_AR", real=True, positive=True)
-plane_S = Symbol("plane_S", real=True, positive=True)
+mass = Symbol("mass", real=True, positive=True)
 bank_rad = Symbol("bank_rad", real=True, positive=True)
+
+# rho: air density in kg/m**3
+rho = Symbol("rho", real=True, positive=True)
+
+# G: gravity in m/s/s
+G = Symbol("G", real=True, positive=True)
+
+# dt: delta time in seconds
 dt = Symbol("dt", real=True, positive=True)
 
 TAS = sqrt(2*SKE)
@@ -40,7 +64,6 @@ TAS = sqrt(2*SKE)
 
 ####### Propeller and electric motor model: #######
 # https://m-selig.ae.illinois.edu/props/propDB.html
-# TODO design an equation to predict CT curve as a function of propeller measurements (diameter, pitch, chord, blades)
 
 # Propeller speed in revolutions per second
 prop_n = prop_omega/(2*pi)
@@ -75,6 +98,9 @@ prop_omega_dot = (motor_torque+prop_torque) / prop_Ixx
 ####### Power curve model: #######
 # https://web.mit.edu/16.unified/www/FALL/thermodynamics/notes/node97.html
 
+plane_S = plane_wingspan*plane_chord
+plane_AR = plane_wingspan/plane_chord
+
 flight_specific_power_required = (0.5 * rho * TAS**3 * plane_S * plane_CD0 + (mass*G/cos(bank_rad))**2/(0.5*rho*TAS*plane_S * (pi*E*plane_AR)))/mass
 
 # Rate of change of specific total energy in J/kg
@@ -102,11 +128,11 @@ subs = {
     SKE: 0.5*Symbol("TECS.sp")**2,
     #SKE:0.5*17**2,
     mass:15,
-    plane_S: 2.005,
-    plane_AR: 16.6,
+    plane_wingspan: 6,
+    plane_chord: 0.334,
     bank_rad:radians(1)*Symbol("ATT.Roll"),
     #bank_rad:radians(0),
-    plane_CD0: .006,
+    plane_CD0: .016,
     rho:(1.0/Symbol("CTUN.E2T"))**0.5*1.225,
     #rho:1.225,
     G: 9.81,
