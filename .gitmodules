@@ -1,0 +1,6 @@
+[submodule "mpc/eigen"]
+	path = mpc/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "mpc/libmpc"]
+	path = mpc/libmpc
+	url = git@github.com:nicolapiccinelli/libmpc.git
