@@ -41,7 +41,8 @@ propdata = {
     "dCTdJ":[],
     "etamax":[],
     "RPM/D":[],
-    "dalphadJ0*C75/D":[]
+    "dalphadJ0*C75/D":[],
+    "ctmin":[]
     }
 
 maxrpms = {}
@@ -78,7 +79,12 @@ for fn in fns:
 
         try:
             name,diameter_inches,pitch_inches,rpm = re.match(r"^([^_]+)_([0-9.]+)x([0-9.]+).+([0-9]{4})\.txt", os.path.split(fn)[-1]).groups()
+            print(diameter_inches)
+        except:
+            print(fn, "can't be matched")
+            continue
 
+        try:
             geomfn = os.path.split(fn)[0]+"/"+name+"_"+diameter_inches+"x"+pitch_inches+"_geom.txt"
             D = float(diameter_inches)*0.0254
             pitch = float(pitch_inches)*0.0254
@@ -104,7 +110,6 @@ for fn in fns:
             if c75 is None:
                 continue
         except:
-            #print(fn, "can't be matched")
             continue
 
         J = []
@@ -152,6 +157,11 @@ for fn in fns:
 
         #plt.plot(D,pitch,marker='x')
 
+        propdata["ctmin"].append(min(CT))
+
+        if min(CT) < -max(CT)*0.2:
+            plt.plot(J, CT)
+
         J_corrected = J*D/pitch
         J_corrected2 = J*D/pitch_calculated
 
@@ -171,7 +181,7 @@ for fn in fns:
         propdata["D"].append(D)
         propdata["c75"].append(c75)
         propdata["c75/R"].append(c75/D*2)
-        propdata["CT0"].append(-params[1]/params[0]*D/pitch)
+        propdata["CT0"].append(-params[1]/params[0])
         propdata["dCTdJ"].append(params[0])
         propdata["etamax"].append(max(eta))
         propdata["RPM/D"].append(rpm/D/120)
@@ -182,6 +192,8 @@ for fn in fns:
 
 df = pd.DataFrame(propdata, index=index)
 
+print(df[df.ctmin == df.ctmin.min()])
+print(df.min())
 print()
 print(df.mean())
 print()
@@ -194,26 +206,25 @@ y = df['CT0']
 
 #fig = plt.figure(figsize=(10, 10))
 #ax = plt.axes(projection='3d')
+#ax.scatter3D(df['dalphadJ0*C75/D'],df['pitch/D'],df['CT0'])
+#plt.xlabel('dalphadJ0*C75/D')
+#plt.ylabel('D')
 
-#ax.scatter3D(df['pitch/D'],df['c75'],df['dCTdJ'])
-#plt.xlabel('pitch')
-#plt.ylabel('c75')
+#fig, axes = plt.subplots(nrows=2, ncols=3)
+#df.plot.scatter(x='pitch/D', y='etamax', ax=axes[0,0])
+#df.plot.scatter(x='D', y='etamax', ax=axes[0,1])
+#df.plot.scatter(x='c75/R', y='etamax', ax=axes[0,2])
 
-fig, axes = plt.subplots(nrows=2, ncols=3)
-df.plot.scatter(x='dalphadJ0*C75/D', y='dCTdJ', ax=axes[0,0])
-df.plot.scatter(x='D', y='dCTdJ', ax=axes[0,1])
-df.plot.scatter(x='c75/R', y='dCTdJ', ax=axes[0,2])
-
-df.plot.scatter(x='pitch/D', y='CT0', ax=axes[1,0])
-df.plot.scatter(x='dalphadJ0*C75/D', y='CT0', ax=axes[1,1])
-df.plot.scatter(x='c75/R', y='CT0', ax=axes[1,2])
+#df.plot.scatter(x='pitch/D', y='CT0', ax=axes[1,0])
+#df.plot.scatter(x='D', y='CT0', ax=axes[1,1])
+#df.plot.scatter(x='c75/R', y='CT0', ax=axes[1,2])
 
 from sklearn import linear_model
 regr = linear_model.HuberRegressor()
 regr.fit(X, y)
 print("score", regr.score(X,y))
 
-print("CT0", regr.predict([[0.7884615384615384,.0067]])*0.7884615384615384)
+print("CT0", regr.predict([[0.7884615384615384,.0067]]))
 
 #print(regr.predict([[.254,.2794,.125]])) # apce11x10
 
