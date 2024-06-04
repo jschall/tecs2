@@ -148,7 +148,7 @@ for fn in fns:
 
         beta75_calculated = atan(pitch/(2*pi*D*0.5*0.75))
 
-        dalphadJ0 = -1.33333333333333/(pi*(1 + 2.77777777777778*pitch**2/(pi**2*D**2)))
+        dalphadJ0 = -1.33333333333333/(pi*(1 + 1.77777777777778*pitch**2/(pi**2*D**2)))
 
         #plt.plot(D,pitch,marker='x')
 
@@ -217,7 +217,7 @@ print("CT0", regr.predict([[0.7884615384615384,.0067]])*0.7884615384615384)
 
 #print(regr.predict([[.254,.2794,.125]])) # apce11x10
 
-X = df[['dalphadJ0*C75/D','c75/R']]
+X = df[['dalphadJ0*C75/D']]
 y = df['dCTdJ']
 regr = linear_model.HuberRegressor()
 regr.fit(X, y)
@@ -227,11 +227,11 @@ print(regr.intercept_)
 D = .6604
 pitch = .5207
 c75 = 0.022
-dalphadJ0 = -1.33333333333333/(pi*(1 + 2.77777777777778*pitch**2/(pi**2*D**2)))
+dalphadJ0 = -1.33333333333333/(pi*(1 + 1.77777777777778*pitch**2/(pi**2*D**2)))
 
 print("dalphadJ0", dalphadJ0)
 print("score", regr.score(X,y))
-print("dCTdJ", regr.predict([[dalphadJ0*0.022/(D/2),.022]]))
+print("dCTdJ", regr.predict([[dalphadJ0*0.022/D]]))
 #print(regr.coef_*np.matrix([.53,.6604,.0067]).transpose()+regr.intercept_)
 #print(regr.coef_.transpose())
 #print(regr.intercept_)
