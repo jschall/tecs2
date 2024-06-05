@@ -34,9 +34,11 @@ motor_R = Symbol("motor_R", real=True, positive=True)
 prop_D = Symbol("prop_D", real=True, positive=True)
 prop_Ixx = Symbol("prop_Ixx", real=True, positive=True)
 prop_J0T   = Symbol("prop_J0T", real=True, positive=True)
-prop_J0P   = Symbol("prop_J0P", real=True, positive=True) #
+prop_J0P   = Symbol("prop_J0P", real=True, positive=True)
 prop_dCTdJ = Symbol("prop_dCTdJ", real=True, negative=True)
 prop_dCPdJ = Symbol("prop_dCPdJ", real=True, negative=True)
+prop_maxCT = Symbol("prop_maxCT", real=True, negative=True)
+prop_minCT = Symbol("prop_minCT", real=True, negative=True)
 
 # Plane parameters
 # wingspan: wingspan in meters
@@ -72,7 +74,7 @@ prop_n = prop_omega/(2*pi)
 J = TAS/(prop_n*prop_D)
 
 # Model CT as a function of J
-prop_CT = (J-prop_J0T)*prop_dCTdJ # Thrust coefficient
+prop_CT = Piecewise((prop_minCT, (J-prop_J0T)*prop_dCTdJ < prop_minCT),(prop_maxCT, (J-prop_J0T)*prop_dCTdJ > prop_maxCT),((J-prop_J0T)*prop_dCTdJ,True)) # Thrust coefficient
 prop_CP = (J-prop_J0P)*prop_dCPdJ # Power coefficient
 prop_CQ = prop_CP/(2*pi) # Torque coefficient
 
@@ -132,7 +134,7 @@ def solveforvmotor():
 
 def generate_mavexplorer_strings():
     subs = {
-        prop_J0T  : 1,
+        prop_J0T  : 1.04,
         prop_J0P  : 0.92,
         prop_dCTdJ: -0.09,
         prop_dCPdJ: -0.09,
@@ -152,9 +154,7 @@ def generate_mavexplorer_strings():
     beta75 = atan(pitch/(2*pi*D*0.5*0.75))
     phi75 = atan(J/(pi*0.75))
     alpha75 = beta75 - phi75
-    prop_specific_power_out_truth = Symbol("STEdot")+flight_specific_power_required
-    prop_thrust_truth = prop_specific_power_out_truth/TAS * mass
-    prop_CT_truth = prop_thrust_truth/(rho*prop_n**2*prop_D**4)
+
 
     stedot_truth_graphstring = "TEC3.KED+TEC3.PED"+"#stedot_truth"
     stedot_graphstring = str(simplify(STEdot.subs(subs).evalf())).replace(" ","")+"#stedot_predicted"

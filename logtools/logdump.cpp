@@ -35,13 +35,14 @@ int main(int argc, char** argv) {
     float prop_omega=0;
     float STEdot=0;
     float bank_rad=0;
+    float t=0;
 
     bool have_TECS = false;
     bool have_CTUN = false;
     bool have_ATT = false;
     bool have_ESC = false;
 
-    cout << "rho,TAS,prop_omega,STEdot,bank_rad" << endl;
+    cout << "t,rho,TAS,prop_omega,STEdot,bank_rad" << endl;
     DFParser::message_t msg;
     while(parser.next_message(msg)) {
         auto& fields = parser.get_fields(msg);
@@ -81,12 +82,16 @@ int main(int argc, char** argv) {
         if (parser.get_message_name(msg) == "TEC3") {
             float KED;
             float PED;
+            uint64_t time_us;
+            parser.get_scalar_field(msg,"TimeUS", time_us);
             parser.get_scalar_field(msg,"KED", KED);
             parser.get_scalar_field(msg,"PED", PED);
             STEdot = KED+PED;
 
+            t = time_us*1e-6;
+
             if (have_TECS && have_CTUN && have_ATT && have_ESC) {
-                cout << rho << "," << TAS << "," << prop_omega << "," << STEdot << "," << bank_rad << endl;
+                cout << t << "," << rho << "," << TAS << "," << prop_omega << "," << STEdot << "," << bank_rad << endl;
             }
         }
 
